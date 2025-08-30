@@ -1,0 +1,73 @@
+# vulkan.supp - Comprehensive suppression file for Vulkan applications
+# Usage: valgrind --suppressions=vulkan.supp your_vulkan_app
+
+{
+	memcheck_malloc_suppressions
+	Memcheck:Leak
+	fun:*alloc
+	...
+	obj:/var/cache/nscd/passwd
+}
+{
+	dl_catch_exception_suppressions
+	Memcheck:Leak
+	...
+	fun:_dl_catch_exception
+	...
+}
+{
+	dl_catch_exception_suppressions_addr8
+	Memcheck:Addr8
+	...
+	fun:_dl_catch_exception
+	...
+}
+{
+	dlopen_malloc-suppressions
+	Memcheck:Leak
+	match-leak-kinds: definite
+	fun:malloc
+	...
+	fun:_dl_open
+	...
+}
+{
+	_dl_init_suppressions
+	Memcheck:Leak
+	match-leak-kinds: reachable
+	fun:_Znwm
+	...
+	fun:_dl_init
+}
+{
+	glfwInit_suppressions
+	Memcheck:Leak
+	match-leak-kinds: reachable
+	...
+	fun:glfwInit
+	...
+}
+{
+	XOpenLC_suppressions
+	Memcheck:Leak
+	match-leak-kinds: reachable
+	...
+	fun:_XOpenLC
+	...
+}
+{
+	dbus_suppressions
+	Memcheck:Leak
+	match-leak-kinds: reachable
+	...
+	obj:*/libdbus-1.so*
+	...
+}
+{
+	glibc_tls_suppressions
+	Memcheck:Leak
+	match-leak-kinds: reachable
+	...
+	fun:allocate_dtv_entry
+	...
+}
