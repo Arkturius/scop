@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <scop.h>
+#include <vulkan/vulkan_core.h>
 
 static const String device_extensions[] =
 {
@@ -46,7 +47,7 @@ app_vk_device_extensions(VkPhysicalDevice device)
 
 	extension_properties = malloc(extension_count * sizeof(VkExtensionProperties));
 	if (!extension_properties)
-		app_panic("malloc");
+		app_panic("%s: malloc failed.", __func__);
 
 	vkEnumerateDeviceExtensionProperties(device, NULL, &extension_count, extension_properties);
 	for (u32 i = 0; i < extension_count; ++i)
@@ -125,8 +126,9 @@ app_vk_physical_device(void)
 void
 app_vk_logical_device(void)
 {
-	App	*app		= App_getinstance();
-	u32	qfp_count	= 0;
+	App		*app		= App_getinstance();
+	u32		qfp_count	= 0;
+	float	priority	= 0.0f;
 
 	VkQueueFamilyProperties	*qfps		= app_vk_qfps(app->physical_device, &qfp_count);
 	VkQueueFamilyProperties	*qfp_iter	= app_vk_qfps_find(qfps, qfp_count, app_vk_qfps_present);
@@ -136,48 +138,45 @@ app_vk_logical_device(void)
 	if (!qfp_iter)
 		app_panic("no graphics queue family found.");
 
-	u32	graphics_index = qfp_iter - qfps;
+	app->queue_index = qfp_iter - qfps;
 
-	VkPhysicalDeviceExtendedDynamicStateFeaturesEXT	dynamic = 
-	{
-		.sType					= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
-		.extendedDynamicState	= VK_TRUE,
-		.pNext					= NULL,
-	};
-	VkPhysicalDeviceVulkan13Features				vk13 = 
-	{
-		.sType					= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-		.dynamicRendering		= VK_TRUE,
-		.pNext					= &dynamic,
-	};
-	VkPhysicalDeviceFeatures2						features2 =
-	{
-		.sType					= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-		.pNext 					= &vk13,
-	};
-
-	float	priority = 0.0f;
-	VkDeviceQueueCreateInfo	dq_create_info = 
+	const VkDeviceQueueCreateInfo dq_create_info = 
 	{
 		.sType					= VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 		.queueCount				= 1,
-		.queueFamilyIndex		= graphics_index,
+		.queueFamilyIndex		= app->queue_index,
 		.pQueuePriorities		= &priority,
 	};
-	VkDeviceCreateInfo	create_info = 
+
+	const VkDeviceCreateInfo create_info = 
 	{
 		.sType						= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 		.queueCreateInfoCount		= 1,
 		.pQueueCreateInfos			= &dq_create_info,
-		.pNext						= &features2,
+		.pNext						= &(VkPhysicalDeviceFeatures2)
+		{
+			.sType					= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+			.pNext 					= &(VkPhysicalDeviceVulkan13Features)
+			{
+				.sType				= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+				.dynamicRendering	= VK_TRUE,
+				.synchronization2	= VK_TRUE,
+				.pNext				= &(VkPhysicalDeviceExtendedDynamicStateFeaturesEXT)
+				{
+					.sType					= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
+					.extendedDynamicState	= VK_TRUE,
+					.pNext					= NULL,
+				},
+			},
+		},
 		.enabledExtensionCount		= ARRAY_LEN(device_extensions),
-		.ppEnabledExtensionNames	= (const char **) device_extensions,
+		.ppEnabledExtensionNames	= (const char **)device_extensions,
 	};
 
-	if (vkCreateDevice(app->physical_device, &create_info, NULL, &app->logical_device) != VK_SUCCESS)
+	if (vkCreateDevice(app->physical_device, &create_info, NULL, &app->device) != VK_SUCCESS)
 		app_panic("failed to create logical device.");
 
-	vkGetDeviceQueue(app->logical_device, 0, graphics_index, &app->graphics_queue);
+	vkGetDeviceQueue(app->device, 0, app->queue_index, &app->graphics_queue);
 	if (!app->graphics_queue)
 		app_panic("failed to retrieve graphics + present queue.");
 

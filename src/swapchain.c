@@ -3,6 +3,7 @@
  */
 
 #include <scop.h>
+#include <vulkan/vulkan_core.h>
 
 VkSurfaceFormatKHR
 *app_vk_swap_formats(u32 *formats_count)
@@ -110,7 +111,7 @@ app_vk_swapchain_images(void)
 	u32			image_count;
 	VkImages	images;
 
-	vkGetSwapchainImagesKHR(app->logical_device, app->swapchain, &image_count, NULL);
+	vkGetSwapchainImagesKHR(app->device, app->swapchain, &image_count, NULL);
 	if (image_count == 0)
 		app_panic("no images in swapchain.");
 
@@ -118,7 +119,7 @@ app_vk_swapchain_images(void)
 	if (!images.items)
 		app_panic("%s: malloc failed.", __func__);
 
-	vkGetSwapchainImagesKHR(app->logical_device, app->swapchain, &image_count, images.items);
+	vkGetSwapchainImagesKHR(app->device, app->swapchain, &image_count, images.items);
 
 	images.count = image_count;
 	images.capacity = image_count;
@@ -149,10 +150,11 @@ app_vk_swapchain_views(void)
 	vec_foreach(VkImage, img, app->swap_images)
 	{
 		create_info.image = *img;
-		vkCreateImageView(app->logical_device, &create_info, NULL, &view);
+		vkCreateImageView(app->device, &create_info, NULL, &view);
 		vec_append(app->swap_views, view);
 	}
-	app->state = VK_IMAGE_VIEWS;
+	if (app->state != VK_RUNNING)
+		app->state = VK_IMAGE_VIEWS;
 }
 
 void
@@ -164,14 +166,14 @@ app_vk_swapchain(void)
 	u32							min_image_count;
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(app->physical_device, app->surface, &surface_caps);
-	app->swap_format = app_vk_swap_format_choose();
-	app->swap_extent = app_vk_swap_extent_choose(&surface_caps);
 
-	min_image_count = MAX(3, surface_caps.minImageCount);
+	app->swap_format	= app_vk_swap_format_choose();
+	app->swap_extent	= app_vk_swap_extent_choose(&surface_caps);
+	present_mode		= app_vk_swap_present_mode_choose();
+	min_image_count		= MAX(3, surface_caps.minImageCount);
+
 	if (surface_caps.maxImageCount > 0 && min_image_count > surface_caps.maxImageCount)
 		min_image_count = surface_caps.maxImageCount;
-	
-	present_mode = app_vk_swap_present_mode_choose();
 
 	const VkSwapchainCreateInfoKHR	create_info = 
 	{
@@ -188,11 +190,59 @@ app_vk_swapchain(void)
 		.compositeAlpha		= VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 		.presentMode		= present_mode,
 		.clipped			= VK_TRUE,
+		.oldSwapchain		= app->swapchain ? app->swapchain : VK_NULL_HANDLE,
 	};
 
-	if (vkCreateSwapchainKHR(app->logical_device, &create_info, NULL, &app->swapchain) != VK_SUCCESS)
+	VkSwapchainKHR	oldSwapchain = app->swapchain;
+
+	if (vkCreateSwapchainKHR(app->device, &create_info, NULL, &app->swapchain) != VK_SUCCESS)
 		app_panic("failed to create swapchain.");
 
+	if (oldSwapchain != VK_NULL_HANDLE)
+		vkDestroySwapchainKHR(app->device, oldSwapchain, NULL);
+
 	app->swap_images = app_vk_swapchain_images();
-	app->state = VK_SWAPCHAIN;
+	if (app->state != VK_RUNNING)
+		app->state = VK_SWAPCHAIN;
+}
+
+void
+app_vk_swapchain_cleanup(void)
+{
+	App	*app = App_getinstance();
+
+	vec_map_custom
+	(
+		VkImageView, view, app->swap_views,
+		vkDestroyImageView, (app->device, *view, NULL)
+	);
+	vec_count(app->swap_views) = 0;
+	vec_map_custom
+	(
+		VkSemaphore, sem, app->render_semaphores,
+		vkDestroySemaphore, (app->device, *sem, NULL)
+	);
+	vec_count(app->render_semaphores) = 0;
+}
+
+void
+app_vk_swapchain_recreate(void)
+{
+	App	*app = App_getinstance();
+    int width = 0;
+	int	height = 0;
+
+    glfwGetFramebufferSize(app->window, &width, &height);
+    while (width == 0 || height == 0)
+	{
+        glfwGetFramebufferSize(app->window, &width, &height);
+        glfwWaitEvents();
+    }
+
+	vkDeviceWaitIdle(app->device);
+	app_vk_swapchain_cleanup();
+
+	app_vk_swapchain();
+	app_vk_swapchain_views();
+	app_vk_sync_render_semaphores();
 }

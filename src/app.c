@@ -2,7 +2,66 @@
  * app.c
  */
 
+#include <GLFW/glfw3.h>
 #include <scop.h>
+
+static void
+app_window_resize_callback(GLFWwindow *window, int width, int height)
+{
+	App	*app = glfwGetWindowUserPointer(window);
+
+	UNUSED(width);
+	UNUSED(height);
+	app->fb_resized = true;
+}
+
+# define	KEY_MAX			GLFW_KEY_LAST
+# define	KEY_TABLE_MAX	((KEY_MAX / 64) + 1)
+
+# define	key_long_idx(_k)	((_k) >> 6)
+# define	key_bool_idx(_k)	((_k) & 63)
+# define	key_on(_k)			key_table[key_long_idx(_k)] |= 1 << key_bool_idx(_k)
+# define	key_off(_k)			key_table[key_long_idx(_k)] &= ~(1 << key_bool_idx(_k))
+# define	key_is_on(_k)		(key_table[key_long_idx(_k)] & (1 << key_bool_idx(_k)))
+# define	key_is_off(_k)		!(key_is_on(_k))
+
+u64	key_table[KEY_TABLE_MAX] = {0};
+
+static void
+app_key_on(GLFWwindow *window, int key, int scan, int mods)
+{
+	UNUSED(window);
+	UNUSED(scan);
+	UNUSED(mods);
+	key_on(key);
+}
+
+static void
+app_key_off(GLFWwindow *window, int key, int scan, int mods)
+{
+	UNUSED(window);
+	UNUSED(scan);
+	UNUSED(mods);
+	key_off(key);
+}
+
+static void
+app_key_callback(GLFWwindow *window, int key, int scan, int action, int mods)
+{
+	warning("\tACTION = %d", action);
+	switch (action)
+	{
+		case GLFW_PRESS:
+			app_key_on(window, key, scan, mods);
+			break ;
+		case GLFW_RELEASE:
+			app_key_off(window, key, scan, mods);
+			break ;
+		case GLFW_REPEAT:
+		default:
+			break ;
+	}	
+}
 
 void
 app_window_init(void)
@@ -11,17 +70,23 @@ app_window_init(void)
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	app->window = glfwCreateWindow(WIDTH, HEIGHT, "app", NULL, NULL);
+	
+	glfwSetWindowUserPointer(app->window, app);
+	glfwSetFramebufferSizeCallback(app->window, app_window_resize_callback);
+	glfwSetKeyCallback(app->window, app_key_callback);
+
 	if (app->window)
-		app->running = true;
+		app->state = VK_WINDOW;
 }
 
 
 void
 app_vk_init(void)
 {
+	App	*app = App_getinstance();
+
 	info("creating VkInstance.");
 	app_vk_instance();
 
@@ -43,6 +108,20 @@ app_vk_init(void)
 
 	info("creating VkPipelineKHR.");
 	app_vk_pipeline();
+
+ 	info("creating VkCommandPool.")
+ 	app_vk_command_pool();
+
+	info("creating VkVertexBuffers.");
+	app_vk_vertex_buffer();
+
+ 	info("creating VkCommandBuffers")
+ 	app_vk_command_buffers();
+
+ 	info("creating VkSemaphores and VkFences.")
+ 	app_vk_sync_objects();
+
+	app->state = VK_RUNNING;
 }
 
 void
@@ -51,7 +130,14 @@ app_loop(void)
 	App	*app = App_getinstance();
 
 	while (!glfwWindowShouldClose(app->window))
+	{
 		glfwPollEvents();
+		app_vk_draw_frame();
+
+		if (key_is_on(GLFW_KEY_ESCAPE))
+			break ;
+	}
+	vkDeviceWaitIdle(app->device);
 }
 
 void
@@ -61,24 +147,59 @@ app_cleanup(void)
 
 	switch (app->state)
 	{
+		case VK_RUNNING:
+		case VK_SYNC:
+			info("destroying VkSemaphores and VkFences.");
+			vec_map_custom
+			(
+				VkFence, fence, app->draw_fences,
+				vkDestroyFence, (app->device, *fence, NULL)
+			);
+			vec_destroy(app->draw_fences);
+			vec_map_custom
+			(
+				VkSemaphore, semaphore, app->present_semaphores,
+				vkDestroySemaphore, (app->device, *semaphore, NULL)
+			);
+			vec_destroy(app->present_semaphores);
+
+		case VK_CMD_BUFFER:
+			info("destroying VkCommandBuffers.");
+			vkFreeCommandBuffers
+			(
+				app->device, app->cmd_pool,
+				vec_count(app->cmd_buffers), vec_first(app->cmd_buffers)
+			);
+			vec_destroy(app->cmd_buffers);
+
+		case VK_CMD_POOL:
+			info("destroying VkCommandPool.");
+			vkDestroyCommandPool(app->device, app->cmd_pool, NULL);
+
 		case VK_PIPELINE:
 			info("destroying VkPipelineKHR.");
-			vkDestroyShaderModule(app->logical_device, app->shader, NULL);
+			vkDestroyPipelineLayout(app->device, app->pp_layout, NULL);
+			vkDestroyPipeline(app->device, app->pipeline, NULL);
 
 		case VK_IMAGE_VIEWS:
 			info("destroying VkImageViews");
-			vec_foreach(VkImageView, view, app->swap_views)
-				vkDestroyImageView(app->logical_device, *view, NULL);
+			vec_map_custom 
+			(
+				VkImageView, view, app->swap_views,
+				vkDestroyImageView, (app->device, *view, NULL)
+			);
 			vec_destroy(app->swap_images);
 			vec_destroy(app->swap_views);
 			
 		case VK_SWAPCHAIN:
 			info("destroying VkSwapchainKHR");
-			vkDestroySwapchainKHR(app->logical_device, app->swapchain, NULL);
+			app_vk_swapchain_cleanup();
+			vkDestroySwapchainKHR(app->device, app->swapchain, NULL);
+			vec_destroy(app->render_semaphores);
 
 		case VK_DEVICE:
 			info("destroying VkDevice.");
-			vkDestroyDevice(app->logical_device, NULL);
+			vkDestroyDevice(app->device, NULL);
 
 		case VK_SURFACE:
 			info("destroying VkSurfaceKHR");
@@ -93,10 +214,13 @@ app_cleanup(void)
 			}
 			vkDestroyInstance(app->instance, NULL);
 
+		case VK_WINDOW:
+			info("destroying GLFWWindow.");
+			glfwDestroyWindow(app->window);
+
 		default:
 			break ;
 	}
-	glfwDestroyWindow(app->window);
 	glfwTerminate();
 }
 
@@ -106,10 +230,11 @@ app_run(void)
 	App	*app = App_getinstance();
 
 	app_window_init();
-	if (!app->running)
+	if (app->state == VK_NULL)
 		return ;
 
 	app_vk_init();
 	app_loop();
 	app_cleanup();
 }
+

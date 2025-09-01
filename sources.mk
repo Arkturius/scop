@@ -10,4 +10,7 @@ SRCS	:=	main.c		\
 			devices.c 	\
 			queues.c 	\
 			swapchain.c \
-			pipeline.c
+			pipeline.c	\
+			commands.c	\
+			sync.c		\
+			vertices.c	\
