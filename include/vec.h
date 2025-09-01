@@ -5,6 +5,8 @@
 #ifndef _VEC_H
 # define _VEC_H
 
+# include <stdint.h>
+
 # define	vec_decl(_type)													\
 																			\
 	typedef struct _type##_vec												\

@@ -4,6 +4,7 @@
 
 #include <scop.h>
 #include <stdint.h>
+#include <vulkan/vulkan_core.h>
 
 void
 app_vk_command_pool(void)
@@ -136,6 +137,8 @@ app_vk_record_cmd_buffer(u32 image_index)
 
 	vkCmdBeginRendering(cmd_buffer, &rendering_info);
 	vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, app->pipeline);
+	vkCmdBindVertexBuffers(cmd_buffer, 0, 1, &app->vertex_buffer, &(const VkDeviceSize){0});
+	vkCmdBindIndexBuffer(cmd_buffer, app->index_buffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdSetViewport
 	(
 		cmd_buffer, 0, 1, &(VkViewport)
@@ -156,7 +159,7 @@ app_vk_record_cmd_buffer(u32 image_index)
 			.extent 	= app->swap_extent,
 		}
 	);
-	vkCmdDraw(cmd_buffer, 3, 1, 0, 0);
+	vkCmdDrawIndexed(cmd_buffer, ARRAY_LEN(indices), 1, 0, 0, 0);
 	vkCmdEndRendering(cmd_buffer);
 
 	app_vk_transition_image_layout

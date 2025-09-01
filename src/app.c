@@ -112,8 +112,11 @@ app_vk_init(void)
  	info("creating VkCommandPool.")
  	app_vk_command_pool();
 
-	info("creating VkVertexBuffers.");
+	info("creating VkBuffer and VkDeviceMemory. (vertex)");
 	app_vk_vertex_buffer();
+
+	info("creating VkBuffer and VkDeviceMemory. (index)");
+	app_vk_index_buffer();
 
  	info("creating VkCommandBuffers")
  	app_vk_command_buffers();
@@ -171,6 +174,16 @@ app_cleanup(void)
 				vec_count(app->cmd_buffers), vec_first(app->cmd_buffers)
 			);
 			vec_destroy(app->cmd_buffers);
+
+		case VK_INDEX_BUFFER:
+			info("destroying VkDeviceMemory and VkBuffer. (index)");
+			vkFreeMemory(app->device, app->index_buffer_mem, NULL);
+			vkDestroyBuffer(app->device, app->index_buffer, NULL);
+
+		case VK_VERTEX_BUFFER:
+			info("destroying VkDeviceMemory and VkBuffer. (vertex)");
+			vkFreeMemory(app->device, app->vertex_buffer_mem, NULL);
+			vkDestroyBuffer(app->device, app->vertex_buffer, NULL);
 
 		case VK_CMD_POOL:
 			info("destroying VkCommandPool.");

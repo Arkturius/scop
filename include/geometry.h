@@ -5,7 +5,7 @@
 #if !defined (_GEOMETRY_H)
 # define _GEOMETRY_H
 
-# include <scop.h>
+# include <types.h>
 
 # define	__align(_x)	__attribute__((aligned(_x)))
 

@@ -10,6 +10,7 @@
 # include <vulkan/vulkan.h>
 
 # include <types.h>
+# include <geometry.h>
 # include <singleton.h>
 
 # define	WIDTH		1366
@@ -29,6 +30,8 @@ typedef enum	_appstate
 	VK_IMAGE_VIEWS	,
 	VK_PIPELINE		,
 	VK_CMD_POOL		,
+	VK_VERTEX_BUFFER,
+	VK_INDEX_BUFFER ,
 	VK_CMD_BUFFER	,
 	VK_SYNC			,
 	VK_RUNNING		,
@@ -70,6 +73,11 @@ typedef struct	_app
 	VkPipeline					pipeline;
 
 	VkBuffer					vertex_buffer;
+	VkDeviceMemory				vertex_buffer_mem;
+
+	VkBuffer					index_buffer;
+	VkDeviceMemory				index_buffer_mem;
+
 	VkCommandPool				cmd_pool;
 	VkCommandBuffers			cmd_buffers;
 	VkSemaphores				present_semaphores;
@@ -83,6 +91,8 @@ typedef struct	_app
 
 extern volatile bool	enable_validation_layers;
 extern u64				key_table[];
+extern const Vertex		vertices[4];
+extern const u32		indices[6];
 
 singleton_decl(App);
 
@@ -170,6 +180,12 @@ void
 app_vk_command_pool(void);
 
 void
+app_vk_vertex_buffer();
+
+void
+app_vk_index_buffer();
+
+void
 app_vk_command_buffers(void);
 
 void
@@ -180,8 +196,5 @@ app_vk_sync_render_semaphores();
 
 void
 app_vk_draw_frame(void);
-
-void
-app_vk_vertex_buffer();
 
 #endif

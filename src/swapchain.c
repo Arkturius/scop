@@ -2,6 +2,7 @@
  * swapchain.c
  */
 
+#include "types.h"
 #include <scop.h>
 #include <vulkan/vulkan_core.h>
 
@@ -201,6 +202,7 @@ app_vk_swapchain(void)
 	if (oldSwapchain != VK_NULL_HANDLE)
 		vkDestroySwapchainKHR(app->device, oldSwapchain, NULL);
 
+	vec_destroy(app->swap_images);
 	app->swap_images = app_vk_swapchain_images();
 	if (app->state != VK_RUNNING)
 		app->state = VK_SWAPCHAIN;
