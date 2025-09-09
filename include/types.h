@@ -26,8 +26,8 @@ typedef	intptr_t	iptr;
 typedef float		f32;
 typedef double		f64;
 
-# define    SHIFT_ARGS(ac, av)  (ac--, *av++)
-# define    UNUSED(_x)          (void)(_x)
+# define    shift_args(ac, av)  (ac--, *av++)
+# define    unused(_x)          (void)(_x)
 
 # define    info(_s, ...)                                              \
     dprintf(2, "[INFO]   | "_s"\n", ##__VA_ARGS__);
@@ -38,24 +38,24 @@ typedef double		f64;
 # define    warning(_s, ...)                                          \
     dprintf(2, "[WARNING]| "_s"\n", ##__VA_ARGS__);
 
-# define    _CONCAT(_a, _b) _a##_b
-# define    CONCAT(_a, _b)  _CONCAT(_a, _b)
+# define    _concat(_a, _b)			_a##_b
+# define    concat(_a, _b)			_concat(_a, _b)
 
-# define    STRINGIFY(_x)   #_x
+# define    stringify(_x)			#_x
 
-# define	ARRAY_LEN(_arr)		(sizeof(_arr)/sizeof(_arr[0]))
+# define	array_len(_arr)			(sizeof(_arr)/sizeof(_arr[0]))
 
-# define	MIN(_a, _b)		((_a) < (_b) ? (_a) : (_b))
-# define	MAX(_a, _b)		((_a) > (_b) ? (_a) : (_b))
+# define	min(_a, _b)				((_a) < (_b) ? (_a) : (_b))
+# define	max(_a, _b)				((_a) > (_b) ? (_a) : (_b))
 
-# define	CLAMP(_v, _min, _max)	MIN(MAX(_v, _min), _max)
+# define	clamp(_v, _min, _max)	min(max(_v, _min), _max)
 
 # define	struct_null(_t)			((_t *){0})
 # define	struct_offset(_t, _d)	((u64)&(struct_null(_t)->_d))
 
-# define VEC_IMPLEMENTATION
-# include "vec.h"
+# define ARR_IMPLEMENTATION
+# include <arr.h>
 
-typedef char        *String;
+typedef char	*String;
 
 #endif // _TYPES_H

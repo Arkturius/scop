@@ -17,7 +17,7 @@ vert_main(vs_input input)
     vs_output	output;
 
     output.pos		= float4(input.pos, 0.0, 1.0);
-    output.color	= input.color;
+    output.color	= float3(input.pos, input.color.z);
 
     return (output);
 }

@@ -4,47 +4,18 @@
 
 #include <assert.h>
 
-#include <scop.h>
-#include <vulkan/vulkan_core.h>
+#include <IG_engine.h>
+#include <IG_vkcore.h>
+#include <IG_renderer.h>
 
 #define	APP_SHADER_PATH	"src/shaders/shader.spv"
 
-static VkShaderModule 
-app_vk_shader_module(void)
-{
-	App				*app = App_getinstance();
-	ShaderFile		shader_file;
-	VkShaderModule	shader;
-
-	shader_file = app_shader_read(APP_SHADER_PATH);
-	if (!shader_file.content)
-		app_panic("failed to load shader.");
-
-	assert(((uptr)shader_file.content & (sizeof(uint32_t) - 1)) == 0);
-
-	const VkShaderModuleCreateInfo	create_info = 
-	{
-		.sType		= VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize	= shader_file.size,
-		.pCode		= (uint32_t *)shader_file.content,
-	};
-
-	VkResult	ret = vkCreateShaderModule(app->device, &create_info, NULL, &shader);
-	
-	app_shader_cleanup(shader_file);
-	if (ret != VK_SUCCESS)
-		app_panic("failed to create shader module.");
-
-	return (shader);
-}
-
 void
-app_vk_pipeline(void)
+IG_vk_pipeline(void)
 {
-	App				*app = App_getinstance();
 	VkShaderModule	shader_module;
 
-	shader_module = app_vk_shader_module();
+	shader_module = IG_vk_shader_module();
 
 	const VkPipelineShaderStageCreateInfo shader_stages[2] = 
 	{
@@ -62,7 +33,7 @@ app_vk_pipeline(void)
 		}
 	};
 
-	VkVertexInputBindingDescription	vib_desc = app_vk_vertex_get_binding();
+	VkVertexInputBindingDescription	vib_desc = IG_vk_vertex_get_binding();
 
 	const VkPipelineVertexInputStateCreateInfo vis_info = 
 	{
@@ -70,7 +41,7 @@ app_vk_pipeline(void)
 		.vertexBindingDescriptionCount = 1,
 		.vertexAttributeDescriptionCount = 2,
 		.pVertexBindingDescriptions = &vib_desc,
-		.pVertexAttributeDescriptions = app_vk_vertex_get_attributes(),
+		.pVertexAttributeDescriptions = IG_vk_vertex_get_attributes(),
 	};
 
 	const VkPipelineInputAssemblyStateCreateInfo ias_info =
@@ -88,15 +59,15 @@ app_vk_pipeline(void)
 		{
 			.x			= 0.0f,
 			.y			= 0.0f,
-			.width		= app->swap_extent.width,
-			.height		= app->swap_extent.height,
+			.width		= IG.renderer->swap_extent.width,
+			.height		= IG.renderer->swap_extent.height,
 			.minDepth	= 0.0f,
 			.maxDepth	= 0.0f,
 		},
 		.pScissors		= &(VkRect2D)
 		{
 			.offset		= (VkOffset2D){0, 0},
-			.extent 	= app->swap_extent,
+			.extent 	= IG.renderer->swap_extent,
 		},
 	};
 
@@ -158,14 +129,14 @@ app_vk_pipeline(void)
 		.pushConstantRangeCount	= 0,
 	};
 
-	if (vkCreatePipelineLayout(app->device, &lay_info, NULL, &app->pp_layout) != VK_SUCCESS)
-		app_panic("failed to create pipeline layout.");
+	if (vkCreatePipelineLayout(IG.vulkan->device, &lay_info, NULL, &IG.renderer->pp_layout) != VK_SUCCESS)
+		IG_panic("failed to create pipeline layout.");
 	
 	const VkPipelineRenderingCreateInfo rend_info =
 	{
 		.sType						= VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
 		.colorAttachmentCount		= 1,
-		.pColorAttachmentFormats	= &app->swap_format,
+		.pColorAttachmentFormats	= &IG.renderer->swap_format,
 	};
 
 	const VkGraphicsPipelineCreateInfo pp_info = 
@@ -180,14 +151,14 @@ app_vk_pipeline(void)
 		.pMultisampleState		= &mss_info,
 		.pColorBlendState		= &cbs_info,
 		.pDynamicState			= &dys_info,
-		.layout					= app->pp_layout,
+		.layout					= IG.renderer->pp_layout,
 		.renderPass				= NULL,
 		.pNext					= &rend_info,
 	};
 
-	if (vkCreateGraphicsPipelines(app->device, VK_NULL_HANDLE, 1, &pp_info, NULL, &app->pipeline) != VK_SUCCESS)
-		app_panic("failed to create graphics pipeline.");
+	if (vkCreateGraphicsPipelines(IG.vulkan->device, VK_NULL_HANDLE, 1, &pp_info, NULL, &IG.renderer->pipeline) != VK_SUCCESS)
+		IG_panic("failed to create graphics pipeline.");
 
-	vkDestroyShaderModule(app->device, shader_module, NULL);
-	app->state = VK_PIPELINE;
+	vkDestroyShaderModule(IG.vulkan->device, shader_module, NULL);
+	IG.state = IG_PIPELINE;
 }

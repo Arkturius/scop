@@ -2,15 +2,14 @@
  * commands.c
  */
 
-#include <scop.h>
-#include <stdint.h>
-#include <vulkan/vulkan_core.h>
+#include <IG_engine.h>
+#include <IG_vkcore.h>
+#include <IG_renderer.h>
+#include <IG_memory.h>
 
 void
-app_vk_command_pool(void)
+IG_vk_command_pool(void)
 {
-	App	*app = App_getinstance();
-
 	const VkCommandPoolCreateInfo create_info = 
 	{
 		.sType				= VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -18,37 +17,35 @@ app_vk_command_pool(void)
 		.queueFamilyIndex	= 0,
 	};
 
-	if (vkCreateCommandPool(app->device, &create_info, NULL, &app->cmd_pool) != VK_SUCCESS)
-		app_panic("failed to create command pool.");
+	if (vkCreateCommandPool(IG.vulkan->device, &create_info, NULL, &IG.renderer->cmd_pool) != VK_SUCCESS)
+		IG_panic("failed to create command pool.");
 
-	app->state = VK_CMD_POOL;
+	IG.state = IG_CMD_POOL;
 }
 
 void
-app_vk_command_buffers(void)
+IG_vk_command_buffers(void)
 {
-	App *app = App_getinstance();
-
 	const VkCommandBufferAllocateInfo alloc_info = 
 	{
 		.sType				= VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool		= app->cmd_pool,
+		.commandPool		= IG.renderer->cmd_pool,
 		.level				= VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount	= MAX_FRAMES,
 	};
 
-	vec_count(app->cmd_buffers) = 0;
-	if (!app->cmd_buffers.items)
-		vec_reserve(app->cmd_buffers, MAX_FRAMES);
-	if (vkAllocateCommandBuffers(app->device, &alloc_info, app->cmd_buffers.items) != VK_SUCCESS)
-		app_panic("failed to allocate command buffers.");
-	vec_count(app->cmd_buffers) = MAX_FRAMES;
+	arr_count(IG.renderer->cmd_buffers) = 0;
+	if (!IG.renderer->cmd_buffers.items)
+		arr_reserve(IG.renderer->cmd_buffers, MAX_FRAMES);
+	if (vkAllocateCommandBuffers(IG.vulkan->device, &alloc_info, IG.renderer->cmd_buffers.items) != VK_SUCCESS)
+		IG_panic("failed to allocate command buffers.");
+	arr_count(IG.renderer->cmd_buffers) = MAX_FRAMES;
 
-	app->state = VK_CMD_BUFFER;
+	IG.state = IG_CMD_BUFFER;
 }
 
 static void 
-app_vk_transition_image_layout
+IG_vk_transition_image_layout
 (
     u32						image_index,
     VkImageLayout			old_layout,
@@ -59,8 +56,6 @@ app_vk_transition_image_layout
     VkPipelineStageFlags2	dst_stage_mask
 )
 {
-	App	*app = App_getinstance();
-
 	const VkImageMemoryBarrier2 barrier = 
 	{
 		.sType					= VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -72,7 +67,7 @@ app_vk_transition_image_layout
         .dstAccessMask			= dst_access_mask,
         .srcQueueFamilyIndex	= VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex	= VK_QUEUE_FAMILY_IGNORED,
-        .image					= app->swap_images.items[image_index],
+        .image					= IG.renderer->swap_images.items[image_index],
         .subresourceRange		= (VkImageSubresourceRange)
 		{
             .aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT,
@@ -90,15 +85,13 @@ app_vk_transition_image_layout
 		.pImageMemoryBarriers = &barrier,
 	};
 
-	vkCmdPipelineBarrier2(app->cmd_buffers.items[app->current_frame], &dep_info);
+	vkCmdPipelineBarrier2(IG.renderer->cmd_buffers.items[IG.current_frame], &dep_info);
 }
 
 void
-app_vk_record_cmd_buffer(u32 image_index)
+IG_vk_record_cmd_buffer(u32 image_index)
 {
-	App				*app = App_getinstance();
-
-	VkCommandBuffer	cmd_buffer = app->cmd_buffers.items[app->current_frame];
+	VkCommandBuffer	cmd_buffer = IG.renderer->cmd_buffers.items[IG.current_frame];
 
 	const VkCommandBufferBeginInfo begin_info = 
 	{
@@ -106,7 +99,7 @@ app_vk_record_cmd_buffer(u32 image_index)
 	};
 
 	vkBeginCommandBuffer(cmd_buffer, &begin_info);
-	app_vk_transition_image_layout
+	IG_vk_transition_image_layout
 	(
 		image_index,
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -121,13 +114,13 @@ app_vk_record_cmd_buffer(u32 image_index)
 	VkRenderingInfo	rendering_info	=
 	{
 		.sType					= VK_STRUCTURE_TYPE_RENDERING_INFO,
-		.renderArea				= { .offset = { 0, 0 }, .extent = app->swap_extent },
+		.renderArea				= { .offset = { 0, 0 }, .extent = IG.renderer->swap_extent },
     	.layerCount				= 1,
     	.colorAttachmentCount	= 1,
     	.pColorAttachments		= &(VkRenderingAttachmentInfo)
 		{
 			.sType			= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-			.imageView		= app->swap_views.items[image_index],
+			.imageView		= IG.renderer->swap_views.items[image_index],
 			.imageLayout	= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			.loadOp			= VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp		= VK_ATTACHMENT_STORE_OP_STORE,
@@ -136,17 +129,17 @@ app_vk_record_cmd_buffer(u32 image_index)
 	};
 
 	vkCmdBeginRendering(cmd_buffer, &rendering_info);
-	vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, app->pipeline);
-	vkCmdBindVertexBuffers(cmd_buffer, 0, 1, &app->vertex_buffer, &(const VkDeviceSize){0});
-	vkCmdBindIndexBuffer(cmd_buffer, app->index_buffer, 0, VK_INDEX_TYPE_UINT32);
+	vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, IG.renderer->pipeline);
+	vkCmdBindVertexBuffers(cmd_buffer, 0, 1, &IG.buffer->vertex, &(const VkDeviceSize){0});
+	vkCmdBindIndexBuffer(cmd_buffer, IG.buffer->index, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdSetViewport
 	(
 		cmd_buffer, 0, 1, &(VkViewport)
 		{
 			.x			= 0.0f,
 			.y			= 0.0f,
-			.width		= app->swap_extent.width,
-			.height		= app->swap_extent.height,
+			.width		= IG.renderer->swap_extent.width,
+			.height		= IG.renderer->swap_extent.height,
 			.minDepth	= 0.0f,
 			.maxDepth	= 0.0f,
 		}
@@ -156,13 +149,13 @@ app_vk_record_cmd_buffer(u32 image_index)
 		cmd_buffer, 0, 1, &(VkRect2D)
 		{
 			.offset		= (VkOffset2D){0, 0},
-			.extent 	= app->swap_extent,
+			.extent 	= IG.renderer->swap_extent,
 		}
 	);
-	vkCmdDrawIndexed(cmd_buffer, ARRAY_LEN(indices), 1, 0, 0, 0);
+	vkCmdDrawIndexed(cmd_buffer, array_len(indices), 1, 0, 0, 0);
 	vkCmdEndRendering(cmd_buffer);
 
-	app_vk_transition_image_layout
+	IG_vk_transition_image_layout
 	(
 		image_index,
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -176,37 +169,35 @@ app_vk_record_cmd_buffer(u32 image_index)
 }
 
 void
-app_vk_draw_frame(void)
+IG_vk_draw_frame(void)
 {
-	App	*app = App_getinstance();
 	u32	image_index;
 
-	VkCommandBuffer	cmd_buffer			= app->cmd_buffers.items[app->current_frame];
-	VkSemaphore		present_semaphore	= app->present_semaphores.items[app->current_frame];
-	VkFence			draw_fence			= app->draw_fences.items[app->current_frame];
+	VkCommandBuffer	cmd_buffer			= IG.renderer->cmd_buffers.items[IG.current_frame];
+	VkSemaphore		present_semaphore	= IG.renderer->present_semaphores.items[IG.current_frame];
+	VkFence			draw_fence			= IG.renderer->draw_fences.items[IG.current_frame];
 	VkResult		result;
 
-	while (vkWaitForFences(app->device, 1, &draw_fence, VK_TRUE, UINT64_MAX) == VK_TIMEOUT)
-		;
+	while (vkWaitForFences(IG.vulkan->device, 1, &draw_fence, VK_TRUE, UINT64_MAX) == VK_TIMEOUT);
 
 	result = vkAcquireNextImageKHR
 	(
-		app->device, app->swapchain, UINT64_MAX,
+		IG.vulkan->device, IG.renderer->swapchain, UINT64_MAX,
 		present_semaphore, NULL, &image_index
 	);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
-		vkResetFences(app->device, 1, &draw_fence);
-		app_vk_swapchain_recreate();
+		vkResetFences(IG.vulkan->device, 1, &draw_fence);
+		IG_vk_swapchain_recreate();
 		return ;
 	}
 	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-		app_panic("failed to acquire next image.");
+		IG_panic("failed to acquire next image.");
 	
-	VkSemaphore		render_semaphore	= app->render_semaphores.items[image_index];
+	VkSemaphore		render_semaphore	= IG.renderer->render_semaphores.items[image_index];
 
-	app_vk_record_cmd_buffer(image_index);
-	vkResetFences(app->device, 1, &draw_fence);
+	IG_vk_record_cmd_buffer(image_index);
+	vkResetFences(IG.vulkan->device, 1, &draw_fence);
 
 	const VkSubmitInfo sub_info = 
 	{
@@ -219,7 +210,7 @@ app_vk_draw_frame(void)
 		.pWaitSemaphores		= &present_semaphore,
 		.pSignalSemaphores		= &render_semaphore,
 	};
-	vkQueueSubmit(app->graphics_queue, 1, &sub_info, draw_fence);
+	vkQueueSubmit(IG.vulkan->graphics_queue, 1, &sub_info, draw_fence);
 
 	const VkPresentInfoKHR pres_info =
 	{
@@ -228,17 +219,17 @@ app_vk_draw_frame(void)
 		.swapchainCount		= 1,
 		.pImageIndices		= &image_index,
 		.pWaitSemaphores	= &render_semaphore,
-		.pSwapchains		= &app->swapchain,
+		.pSwapchains		= &IG.renderer->swapchain,
 	};
 
-	result = vkQueuePresentKHR(app->graphics_queue, &pres_info);
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || app->fb_resized)
+	result = vkQueuePresentKHR(IG.vulkan->graphics_queue, &pres_info);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || IG.fb_resized)
 	{
-		app->fb_resized = false;
-		app_vk_swapchain_recreate();
+		IG.fb_resized = false;
+		IG_vk_swapchain_recreate();
 	}
 	else if (result != VK_SUCCESS)
-		app_panic("failed to present swap chain image.");
+		IG_panic("failed to present swap chain image.");
 
-	app->current_frame = (app->current_frame + 1) % MAX_FRAMES;
+	IG.current_frame = (IG.current_frame + 1) % MAX_FRAMES;
 }

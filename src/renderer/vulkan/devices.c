@@ -4,8 +4,8 @@
 
 #include <string.h>
 
-#include <scop.h>
-#include <vulkan/vulkan_core.h>
+#include <IG_engine.h>
+#include <IG_vkcore.h>
 
 static const String device_extensions[] =
 {
@@ -16,26 +16,24 @@ static const String device_extensions[] =
 };
 
 static VkPhysicalDevice
-*app_vk_physical_devices(u32 *device_count)
+*IG_vk_physical_devices(u32 *device_count)
 {
-	App					*app = App_getinstance();
-
 	VkPhysicalDevice	*devices;
 
-	vkEnumeratePhysicalDevices(app->instance, device_count, NULL);
+	vkEnumeratePhysicalDevices(IG.vulkan->instance, device_count, NULL);
 	if (device_count == 0)
-		app_panic("no suitable GPU found.");
+		IG_panic("no suitable GPU found.");
 
 	devices = malloc(*device_count * sizeof(VkPhysicalDevice));
 	if (!devices)
-		app_panic("%s: malloc failed.", __func__);
+		IG_panic("%s: malloc failed.", __func__);
 
-	vkEnumeratePhysicalDevices(app->instance, device_count, devices);
+	vkEnumeratePhysicalDevices(IG.vulkan->instance, device_count, devices);
 	return (devices);
 }
 
 static Strings
-app_vk_device_extensions(VkPhysicalDevice device)
+IG_vk_device_extensions(VkPhysicalDevice device)
 {
 	VkExtensionProperties	*extension_properties	= NULL;
 	Strings					extensions				= {0};
@@ -43,24 +41,24 @@ app_vk_device_extensions(VkPhysicalDevice device)
 
 	vkEnumerateDeviceExtensionProperties(device, NULL, &extension_count, NULL);
 	if (extension_count == 0)
-		app_panic("no device extensions.");
+		IG_panic("no device extensions.");
 
 	extension_properties = malloc(extension_count * sizeof(VkExtensionProperties));
 	if (!extension_properties)
-		app_panic("%s: malloc failed.", __func__);
+		IG_panic("%s: malloc failed.", __func__);
 
 	vkEnumerateDeviceExtensionProperties(device, NULL, &extension_count, extension_properties);
 	for (u32 i = 0; i < extension_count; ++i)
-		vec_append(extensions, strdup(extension_properties[i].extensionName));
+		arr_append(extensions, strdup(extension_properties[i].extensionName));
 
 	free(extension_properties);
 	return (extensions);
 }
 
 static String
-*app_vk_ext_iter(String device_ext, Strings extensions)
+*IG_vk_ext_iter(String device_ext, Strings extensions)
 {
-	vec_foreach(String, ext, extensions)
+	arr_foreach(String, ext, extensions)
 	{
 		if (!strcmp(*ext, device_ext))
 			return (ext);
@@ -69,7 +67,7 @@ static String
 }
 
 static VkPhysicalDevice
-*app_vk_physical_device_pick(VkPhysicalDevice *devices, u32 device_count)
+*IG_vk_physical_device_pick(VkPhysicalDevice *devices, u32 device_count)
 {
 	u32							qfp_count = 0;
 	VkPhysicalDeviceProperties	device_properties;
@@ -82,24 +80,24 @@ static VkPhysicalDevice
 		
 		bool	is_suitable = device_properties.apiVersion >= VK_API_VERSION_1_3;
 		
-		VkQueueFamilyProperties	*qfps		= app_vk_qfps(device, &qfp_count);
-		VkQueueFamilyProperties	*qfp_iter	= app_vk_qfps_find(qfps, qfp_count, app_vk_qfps_graphics);
+		VkQueueFamilyProperties	*qfps		= IG_vk_qfps(device, &qfp_count);
+		VkQueueFamilyProperties	*qfp_iter	= IG_vk_qfps_find(qfps, qfp_count, IG_vk_qfps_graphics);
 
 		free(qfps);
 		is_suitable = is_suitable && (qfp_iter);
 
-		Strings			extensions	= app_vk_device_extensions(device);
+		Strings			extensions	= IG_vk_device_extensions(device);
 		bool			found		= true;
 		const String	*dext		= device_extensions;
 
-		for (; dext < device_extensions + ARRAY_LEN(device_extensions); ++dext)
+		for (; dext < device_extensions + array_len(device_extensions); ++dext)
 		{
-			String	*ext = app_vk_ext_iter(*dext, extensions);
+			String	*ext = IG_vk_ext_iter(*dext, extensions);
 
 			found = found && (ext != extensions.items + extensions.count);
 		}
-		vec_map(String, extensions, free);
-		vec_destroy(extensions);
+		arr_map(String, extensions, free);
+		arr_destroy(extensions);
 
 		is_suitable = is_suitable && found;
 		if (is_suitable)
@@ -109,42 +107,40 @@ static VkPhysicalDevice
 }
 
 void
-app_vk_physical_device(void)
+IG_vk_physical_device(void)
 {
-	App					*app			= App_getinstance();
 	VkPhysicalDevice	*devices		= NULL;
 	u32					device_count	= 0;
 
-	devices = app_vk_physical_devices(&device_count);
+	devices = IG_vk_physical_devices(&device_count);
 
-	app->physical_device = *app_vk_physical_device_pick(devices, device_count);
-	if (!app->physical_device)
-		app_panic("no physical device selected.");
+	IG.vulkan->physical_device = *IG_vk_physical_device_pick(devices, device_count);
+	if (!IG.vulkan->physical_device)
+		IG_panic("no physical device selected.");
 	free(devices);
 }
 
 void
-app_vk_logical_device(void)
+IG_vk_logical_device(void)
 {
-	App		*app		= App_getinstance();
 	u32		qfp_count	= 0;
 	float	priority	= 0.0f;
 
-	VkQueueFamilyProperties	*qfps		= app_vk_qfps(app->physical_device, &qfp_count);
-	VkQueueFamilyProperties	*qfp_iter	= app_vk_qfps_find(qfps, qfp_count, app_vk_qfps_present);
+	VkQueueFamilyProperties	*qfps		= IG_vk_qfps(IG.vulkan->physical_device, &qfp_count);
+	VkQueueFamilyProperties	*qfp_iter	= IG_vk_qfps_find(qfps, qfp_count, IG_vk_qfps_present);
 
 	free(qfps); // TODO : big arena to manage those temporary vecs and mallocs...
 
 	if (!qfp_iter)
-		app_panic("no graphics queue family found.");
+		IG_panic("no graphics queue family found.");
 
-	app->queue_index = qfp_iter - qfps;
+	IG.vulkan->queue_index = qfp_iter - qfps;
 
 	const VkDeviceQueueCreateInfo dq_create_info = 
 	{
 		.sType					= VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 		.queueCount				= 1,
-		.queueFamilyIndex		= app->queue_index,
+		.queueFamilyIndex		= IG.vulkan->queue_index,
 		.pQueuePriorities		= &priority,
 	};
 
@@ -169,16 +165,16 @@ app_vk_logical_device(void)
 				},
 			},
 		},
-		.enabledExtensionCount		= ARRAY_LEN(device_extensions),
+		.enabledExtensionCount		= array_len(device_extensions),
 		.ppEnabledExtensionNames	= (const char **)device_extensions,
 	};
 
-	if (vkCreateDevice(app->physical_device, &create_info, NULL, &app->device) != VK_SUCCESS)
-		app_panic("failed to create logical device.");
+	if (vkCreateDevice(IG.vulkan->physical_device, &create_info, NULL, &IG.vulkan->device) != VK_SUCCESS)
+		IG_panic("failed to create logical device.");
 
-	vkGetDeviceQueue(app->device, 0, app->queue_index, &app->graphics_queue);
-	if (!app->graphics_queue)
-		app_panic("failed to retrieve graphics + present queue.");
+	vkGetDeviceQueue(IG.vulkan->device, 0, IG.vulkan->queue_index, &IG.vulkan->graphics_queue);
+	if (!IG.vulkan->graphics_queue)
+		IG_panic("failed to retrieve graphics + present queue.");
 
-	app->state = VK_DEVICE;
+	IG.state = IG_DEVICE;
 }

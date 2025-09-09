@@ -2,10 +2,11 @@
  * debug.c
  */
 
-#include <scop.h>
+#include <IG_engine.h>
+#include <IG_vkcore.h>
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL
-app_vk_debug_callback
+IG_vk_debug_callback
 (
 	VkDebugUtilsMessageSeverityFlagBitsEXT		severity,
 	VkDebugUtilsMessageTypeFlagsEXT				type,
@@ -13,8 +14,8 @@ app_vk_debug_callback
 	void										*puser_data
 )
 {
-	UNUSED(type);
-	UNUSED(puser_data);
+	unused(type);
+	unused(puser_data);
 
 	if (severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 		error("%s", pcallback_data->pMessage);
@@ -24,39 +25,37 @@ app_vk_debug_callback
 }
 
 VkResult
-app_vk_debug_create(const VkDebugUtilsMessengerCreateInfoEXT *create_info)
+IG_vk_debug_create(const VkDebugUtilsMessengerCreateInfoEXT *create_info)
 {
-	App									*app = App_getinstance();
 	PFN_vkCreateDebugUtilsMessengerEXT	fn;
 
 	fn = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr
 	(
-		app->instance,
+		IG.vulkan->instance,
 		"vkCreateDebugUtilsMessengerEXT"
 	);
 
 	if (fn)
-		return (fn(app->instance, create_info, NULL, &app->debug_messenger));
+		return (fn(IG.vulkan->instance, create_info, NULL, &IG.vulkan->debug_messenger));
 	return (VK_ERROR_EXTENSION_NOT_PRESENT);
 }
 
 void
-app_vk_debug_destroy(void)
+IG_vk_debug_destroy(void)
 {
-	App									*app = App_getinstance();
 	PFN_vkDestroyDebugUtilsMessengerEXT	fn;
 
 	fn = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr
 	(
-		app->instance,
+		IG.vulkan->instance,
 		"vkDestroyDebugUtilsMessengerEXT"
 	);
 	if (fn)
-		fn(app->instance, app->debug_messenger, NULL);
+		fn(IG.vulkan->instance, IG.vulkan->debug_messenger, NULL);
 }
 
 void
-app_vk_debug_messenger(void)
+IG_vk_debug_messenger(void)
 {
 	VkDebugUtilsMessageSeverityFlagsEXT	severity;
 	VkDebugUtilsMessageTypeFlagsEXT		msg_type;
@@ -74,8 +73,8 @@ app_vk_debug_messenger(void)
 		.sType				= VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 		.messageSeverity	= severity,
 		.messageType		= msg_type,
-		.pfnUserCallback	= app_vk_debug_callback,
+		.pfnUserCallback	= IG_vk_debug_callback,
 	};
 	
-	app_vk_debug_create(&debug_info);
+	IG_vk_debug_create(&debug_info);
 }

@@ -2,7 +2,7 @@
 #	Makefile
 #
 
-NAME		:=	scop
+NAME		:=	libengine.so
 
 SRC_DIR		:=	src
 INC_DIR		:=	include
@@ -11,14 +11,14 @@ OBJ_DIR		:=	build
 include			sources.mk
 SRCS		:=	$(addprefix $(SRC_DIR)/, $(SRCS))
 
-COPTS_DIRS	:=	$(INC_DIR)
+COPTS_DIRS	:=	$(INC_DIR) $(INC_DIR)/engine
 COPTS		+=	$(foreach dir, $(COPTS_DIRS), -I$(dir))
 
 OBJS 		:=	$(addprefix $(OBJ_DIR)/, $(SRCS:%.c=%.o))
 
 CC			:=	clang
 
-CFLAGS		:=	-Wall -Wextra -MMD -MP -g
+CFLAGS		:=	 -fPIC -O3 -Wall -Wextra -MMD -MP -g
 LDFLAGS		:=	-lglfw -lvulkan -ldl -pthread -lX11 -lXxf86vm -lXrandr -lXi
 
 SLANG		:=	slangc
@@ -37,6 +37,10 @@ ifeq ($(VERBOSE), 1)
 	CFLAGS	+=	-DVERBOSE=1
 endif
 
+ifeq ($(NDEBUG), 1)
+	CFLAGS	+=	-DNDEBUG
+endif
+
 RM			:=	rm -rf
 MKDIR		:=	mkdir -p
 
@@ -50,7 +54,7 @@ all:					$(SHADER_COMP) $(NAME)
 
 $(NAME):				$(OBJS)
 	@echo " $(GREEN)$(BOLD)$(ITALIC)■$(RESET)  linking	$(GREEN)$(BOLD)$(ITALIC)$(NAME)$(RESET)"
-	@$(CC) $(CFLAGS) $(COPTS) -o $@ $^ $(LDFLAGS)
+	@$(CC) -shared $(CFLAGS) $(COPTS) -o $@ $^ $(LDFLAGS)
 
 $(OBJ_DIR)/src/%.o: 	src/%.c
 	@$(MKDIR) $(@D)
