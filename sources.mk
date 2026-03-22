@@ -20,6 +20,7 @@ SRC_PLATFORM	:=	window.c 		\
 					input.c
 
 SRC_RESOURCES	:=	shaders.c		\
+					images.c		\
 					vertices.c
 
 SRC_RENDERER	:=	instance.c		\
@@ -29,6 +30,7 @@ SRC_RENDERER	:=	instance.c		\
 					swapchain.c		\
 					pipeline.c		\
 					commands.c		\
+					descriptors.c	\
 					sync.c
 
 
@@ -39,7 +41,8 @@ SRC_RESOURCES	:=	$(addprefix $(DIR_RESOURCES)/,	$(SRC_RESOURCES))
 
 SRC_RENDERER	:=	$(addprefix $(DIR_RENDERER)/$(RENDERER)/, $(SRC_RENDERER))
 
-SRCS			:=	$(SRC_CORE)		\
+SRCS			:=	matrix.c		\
+					$(SRC_CORE)		\
                     $(SRC_MEMORY)	\
                     $(SRC_PLATFORM)	\
                     $(SRC_RENDERER)	\

@@ -5,10 +5,9 @@
 #if !defined(_SCOP_H)
 # define _SCOP_H
 
-# include <vulkan/vulkan.h>
-
 # include <types.h>
 # include <geometry.h>
+# include <job.h>
 
 # include <IG_window.h>
 # include <IG_input.h>
@@ -17,20 +16,25 @@
 
 typedef enum	_engine_state
 {
-	IG_NULL			,
-	IG_WINDOW		,
-	IG_INSTANCE 	,
-	IG_SURFACE		,
-	IG_DEVICE		,
-	IG_SWAPCHAIN	,
-	IG_IMAGE_VIEWS	,
-	IG_PIPELINE		,
-	IG_CMD_POOL		,
-	IG_VERTEX_BUFFER,
-	IG_INDEX_BUFFER ,
-	IG_CMD_BUFFER	,
-	IG_SYNC			,
-	IG_RUNNING		,
+	IG_NULL			  ,
+	IG_WINDOW		  ,
+	IG_INSTANCE 	  ,
+	IG_SURFACE		  ,
+	IG_DEVICE		  ,
+	IG_SWAPCHAIN	  ,
+	IG_IMAGE_VIEWS	  ,
+	IG_DS_LAYOUT      ,
+	IG_PIPELINE		  ,
+	IG_CMD_POOL		  ,
+	IG_TEXTURE        ,
+	IG_VERTEX_BUFFER  ,
+	IG_INDEX_BUFFER   ,
+	IG_UNIFORM_BUFFER ,
+	IG_DESCRIPTOR_POOL,
+	IG_DESCRIPTOR_SETS,
+	IG_CMD_BUFFER	  ,
+	IG_SYNC			  ,
+	IG_RUNNING		  ,
 }	IGEngineState;
 
 typedef struct _vulkan_ctx		VulkanCtx;
@@ -47,14 +51,14 @@ typedef struct	_engine
 	Buffer			*buffer;
 	Renderer		*renderer;
 	
+	JOBfile			model_file;
+	JOBdata			model_data;
+
 	u32				current_frame;
 	bool			fb_resized;
 }	Engine;
 
 extern Engine	IG;
-
-extern const Vertex		vertices[4];
-extern const u32		indices[6];
 
 arr_decl(String, Strings);
 

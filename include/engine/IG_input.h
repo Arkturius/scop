@@ -15,10 +15,10 @@
 # define	key_long_idx(_k)	((_k) >> 6)
 # define	key_bool_idx(_k)	((_k) & 63)
 
-# define	key_on(_k)			IG.inputs.key_table[key_long_idx(_k)] |= 1 << key_bool_idx(_k)
-# define	key_off(_k)			IG.inputs.key_table[key_long_idx(_k)] &= ~(1 << key_bool_idx(_k))
+# define	key_on(_k)			IG.inputs.key_table[key_long_idx(_k)] |= 1ULL << key_bool_idx(_k)
+# define	key_off(_k)			IG.inputs.key_table[key_long_idx(_k)] &= ~(1ULL << key_bool_idx(_k))
 
-# define	key_is_on(_k)		(IG.inputs.key_table[key_long_idx(_k)] & (1 << key_bool_idx(_k)))
+# define	key_is_on(_k)		(IG.inputs.key_table[key_long_idx(_k)] & (1ULL << key_bool_idx(_k)))
 # define	key_is_off(_k)		!(key_is_on(_k))
 
 extern u64	key_table[KEY_TABLE_MAX];

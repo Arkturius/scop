@@ -7,6 +7,7 @@
 #include <IG_engine.h>
 #include <IG_vkcore.h>
 #include <IG_renderer.h>
+#include <vulkan/vulkan_core.h>
 
 #define	APP_SHADER_PATH	"src/shaders/shader.spv"
 
@@ -39,7 +40,7 @@ IG_vk_pipeline(void)
 	{
 		.sType		= VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 		.vertexBindingDescriptionCount = 1,
-		.vertexAttributeDescriptionCount = 2,
+		.vertexAttributeDescriptionCount = 3,
 		.pVertexBindingDescriptions = &vib_desc,
 		.pVertexAttributeDescriptions = IG_vk_vertex_get_attributes(),
 	};
@@ -62,7 +63,7 @@ IG_vk_pipeline(void)
 			.width		= IG.renderer->swap_extent.width,
 			.height		= IG.renderer->swap_extent.height,
 			.minDepth	= 0.0f,
-			.maxDepth	= 0.0f,
+			.maxDepth	= 1.0f,
 		},
 		.pScissors		= &(VkRect2D)
 		{
@@ -76,10 +77,18 @@ IG_vk_pipeline(void)
 		.sType					= VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 		.polygonMode			= VK_POLYGON_MODE_FILL,
 		.cullMode				= VK_CULL_MODE_BACK_BIT,
-		.frontFace				= VK_FRONT_FACE_CLOCKWISE,
+		.frontFace				= VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		.depthBiasEnable		= VK_FALSE,
 		.depthBiasSlopeFactor	= 1.0f,
 		.lineWidth				= 1.0f,
+	};
+
+	const VkPipelineDepthStencilStateCreateInfo depth_info =
+	{
+		.sType				= VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable	= VK_TRUE,
+		.depthWriteEnable	= VK_TRUE,
+		.depthCompareOp		= VK_COMPARE_OP_LESS,
 	};
 
 	const VkPipelineMultisampleStateCreateInfo mss_info =
@@ -125,7 +134,8 @@ IG_vk_pipeline(void)
 	const VkPipelineLayoutCreateInfo lay_info = 
 	{
 		.sType					= VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount			= 0,
+		.setLayoutCount			= 1,
+		.pSetLayouts			= &IG.renderer->ds_layout,
 		.pushConstantRangeCount	= 0,
 	};
 
@@ -137,6 +147,7 @@ IG_vk_pipeline(void)
 		.sType						= VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
 		.colorAttachmentCount		= 1,
 		.pColorAttachmentFormats	= &IG.renderer->swap_format,
+		.depthAttachmentFormat		= IG_vk_depth_format(),
 	};
 
 	const VkGraphicsPipelineCreateInfo pp_info = 
@@ -148,6 +159,7 @@ IG_vk_pipeline(void)
 		.pInputAssemblyState	= &ias_info,
 		.pViewportState			= &vs_info,
 		.pRasterizationState	= &rast_info,
+		.pDepthStencilState		= &depth_info,
 		.pMultisampleState		= &mss_info,
 		.pColorBlendState		= &cbs_info,
 		.pDynamicState			= &dys_info,

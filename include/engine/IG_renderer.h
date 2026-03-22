@@ -2,9 +2,11 @@
  * renderer.h
  */
 
+#include <vulkan/vulkan_core.h>
 #if !defined (_RENDERER_H)
 # define _RENDERER_H
 
+# include <IG_memory.h>
 # include <vulkan/vulkan.h>
 
 # include <types.h>
@@ -14,6 +16,9 @@ typedef struct _shaderfile	ShaderFile;
 
 arr_decl(VkImage,			VkImages);
 arr_decl(VkImageView,		VkImageViews);
+
+arr_decl(VkDescriptorSet,	VkDescriptorSets);
+
 arr_decl(VkCommandBuffer,	VkCommandBuffers);
 arr_decl(VkSemaphore,		VkSemaphores);
 arr_decl(VkFence,			VkFences);
@@ -32,8 +37,15 @@ struct _renderer
 	VkImages			swap_images;
 	VkImageViews		swap_views;
 
-	VkPipelineLayout	pp_layout;
-	VkPipeline			pipeline;
+	VkDescriptorSetLayout	ds_layout;
+	VkDescriptorPool		descriptor_pool;
+	VkDescriptorSets		descriptor_sets;
+	VkPipelineLayout		pp_layout;
+	VkPipeline				pipeline;
+
+	UBO					uniform_object;
+	Vec3				pos;
+	Vec3				rot;
 
 	VkCommandPool		cmd_pool;
 	VkCommandBuffers	cmd_buffers;
@@ -70,28 +82,58 @@ VkVertexInputAttributeDescription
 *IG_vk_vertex_get_attributes(void);
 
 void
+IG_vk_descriptor_set_layout(void);
+
+void
 IG_vk_pipeline(void);
+
+VkImageView
+IG_vk_image_view(VkImage image, VkFormat format, VkImageAspectFlags flags);
 
 void
 IG_vk_command_pool(void);
 
-u32
-IG_vk_buffer_memory_type(u32 filter, VkMemoryPropertyFlags properties);
+VkFormat
+IG_vk_depth_format();
 
 void
-IG_vk_vertex_buffer();
+IG_vk_depth_resources(void);
 
 void
-IG_vk_index_buffer();
+IG_vk_uniform_buffers(void);
+
+void
+IG_vk_update_uniforms(void);
+
+void
+IG_vk_descriptor_pool(void);
+
+void
+IG_vk_descriptor_sets(void);
 
 void
 IG_vk_command_buffers(void);
+
+VkCommandBuffer
+IG_vk_command_buffer_single(void);
+
+void
+IG_vk_command_buffer_single_end(VkCommandBuffer cmd_buf);
+
+void
+IG_vk_texture_image(void);
+
+void
+IG_vk_texture_image_view(void);
+
+void
+IG_vk_texture_sampler(void);
 
 void
 IG_vk_sync_objects(void);
 
 void
-IG_vk_sync_render_semaphores();
+IG_vk_sync_render_semaphores(void);
 
 void
 IG_vk_draw_frame(void);

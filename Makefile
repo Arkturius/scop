@@ -8,6 +8,8 @@ SRC_DIR		:=	src
 INC_DIR		:=	include
 OBJ_DIR		:=	build
 
+EXAMPLE_DIR	:=	examples
+
 include			sources.mk
 SRCS		:=	$(addprefix $(SRC_DIR)/, $(SRCS))
 
@@ -56,7 +58,16 @@ $(NAME):				$(OBJS)
 	@echo " $(GREEN)$(BOLD)$(ITALIC)■$(RESET)  linking	$(GREEN)$(BOLD)$(ITALIC)$(NAME)$(RESET)"
 	@$(CC) -shared $(CFLAGS) $(COPTS) -o $@ $^ $(LDFLAGS)
 
-$(OBJ_DIR)/src/%.o: 	src/%.c
+example:				$(OBJ_DIR)/$(EXAMPLE_DIR)/main.o
+	@echo " $(GREEN)$(BOLD)$(ITALIC)■$(RESET)  linking	$(GREEN)$(BOLD)$(ITALIC)$(notdir $@)$(RESET)"
+	@$(CC) $(CFLAGS) $(COPTS) $(NAME) -o $@ $^ $(LDFLAGS)
+
+$(OBJ_DIR)/$(EXAMPLE_DIR)/%.o:	$(EXAMPLE_DIR)/%.c
+	@$(MKDIR) $(@D)
+	@echo " $(CYAN)$(BOLD)$(ITALIC)■$(RESET)  compiling	$(GRAY)$(BOLD)$(ITALIC)$(notdir $@) from $(GRAY)$(BOLD)$(ITALIC)$(notdir $^)$(RESET)"
+	@$(CC) $(CFLAGS) -o $@ -c $(COPTS) $<
+
+$(OBJ_DIR)/$(SRC_DIR)/%.o: 	$(SRC_DIR)/%.c
 	@$(MKDIR) $(@D)
 	@echo " $(CYAN)$(BOLD)$(ITALIC)■$(RESET)  compiling	$(GRAY)$(BOLD)$(ITALIC)$(notdir $@) from $(GRAY)$(BOLD)$(ITALIC)$(notdir $^)$(RESET)"
 	@$(CC) $(CFLAGS) -o $@ -c $(COPTS) $<

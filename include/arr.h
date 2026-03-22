@@ -6,6 +6,7 @@
 # define _ARR_H
 
 # include <stdint.h>
+# include <stdlib.h>
 
 # define	arr_decl(_type, _name)											\
 																			\
@@ -26,14 +27,10 @@
 # define	arr_index(_arr, _e) ((_e) - (_arr.items))
 
 # define	ARR_MIN_SIZE	8
-# define	ARR_MAX_SIZE	131072
 
-#endif // _ARR_H
-
-#if defined(ARR_IMPLEMENTATION)
-
-# include <stdlib.h>
-# include <stdint.h>
+# ifndef ARR_MAX_SIZE
+#  define	ARR_MAX_SIZE	(1 << 28)
+# endif
 
 # define	arr_foreach(_type, _it, _arr)									\
 																			\
@@ -130,4 +127,4 @@
 																			\
 	arr_map_custom(_type, _tmp, _arr, _f, (*_tmp))
 
-#endif // ARR_IMPLEMENTATION
+#endif // _ARR_H

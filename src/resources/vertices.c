@@ -4,18 +4,8 @@
 
 #include <IG_engine.h>
 
-const Vertex	vertices[4] =
-{
-    { .pos = {-0.5f, -0.5f}, .color = {1.0f, 0.0f, 0.0f} },
-    { .pos = { 0.5f, -0.5f}, .color = {0.0f, 1.0f, 0.0f} },
-    { .pos = { 0.5f,  0.5f}, .color = {0.0f, 0.0f, 1.0f} },
-    { .pos = {-0.5f,  0.5f}, .color = {1.0f, 1.0f, 1.0f} }
-};
-
-const u32	indices[6] =
-{
-	0, 1, 2, 2, 3, 0
-};
+Vertex	*vertices = NULL;
+u32		*indices = NULL;
 
 VkVertexInputBindingDescription
 IG_vk_vertex_get_binding(void)
@@ -31,12 +21,12 @@ IG_vk_vertex_get_binding(void)
 VkVertexInputAttributeDescription
 *IG_vk_vertex_get_attributes(void)
 {
-	static VkVertexInputAttributeDescription	attrs[2] =
+	static VkVertexInputAttributeDescription	attrs[3] =
 	{
 		{
 			.binding	= 0,
 			.location	= 0,
-			.format		= VK_FORMAT_R32G32_SFLOAT,
+			.format		= VK_FORMAT_R32G32B32_SFLOAT,
 			.offset		= struct_offset(Vertex, pos),
 		},
 		{
@@ -44,6 +34,12 @@ VkVertexInputAttributeDescription
 			.location	= 1,
 			.format		= VK_FORMAT_R32G32B32_SFLOAT,
 			.offset		= struct_offset(Vertex, color),
+		},
+		{
+			.binding	= 0,
+			.location	= 2,
+			.format		= VK_FORMAT_R32G32_SFLOAT,
+			.offset		= struct_offset(Vertex, tex),
 		},
 	};
 	return (attrs);

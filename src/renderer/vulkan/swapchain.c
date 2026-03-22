@@ -5,6 +5,7 @@
 #include <IG_engine.h>
 #include <IG_vkcore.h>
 #include <IG_renderer.h>
+#include <IG_memory.h>
 
 VkSurfaceFormatKHR
 *IG_vk_swap_formats(u32 *formats_count)
@@ -122,31 +123,22 @@ IG_vk_swapchain_images(void)
 	return (images);
 }
 
+//     vk::raii::ImageView createImageView(vk::raii::Image& image, vk::Format format, vk::ImageAspectFlags aspectFlags) {
+//         vk::ImageViewCreateInfo viewInfo{
+//             .image = image,
+//             .viewType = vk::ImageViewType::e2D,
+//             .format = format,
+//             .subresourceRange = { aspectFlags, 0, 1, 0, 1 }
+//         };
+//         return vk::raii::ImageView(device, viewInfo);
+//     }
 void
 IG_vk_swapchain_views(void)
 {
-	VkImageView	view;
-
-	VkImageViewCreateInfo	create_info = 
-	{
-		.sType				= VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    	.viewType			= VK_IMAGE_VIEW_TYPE_2D,
-		.format				= IG.renderer->swap_format,
-		.subresourceRange	= (VkImageSubresourceRange)
-		{
-			.aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel	= 0,
-			.levelCount		= 1,
-			.baseArrayLayer = 0,
-			.layerCount		= 1,
-		},
-	};
-
 	arr_foreach(VkImage, img, IG.renderer->swap_images)
 	{
-		create_info.image = *img;
-		vkCreateImageView(IG.vulkan->device, &create_info, NULL, &view);
-		arr_append(IG.renderer->swap_views, view);
+		VkImageView	v = IG_vk_image_view(*img, IG.renderer->swap_format, VK_IMAGE_ASPECT_COLOR_BIT);
+		arr_append(IG.renderer->swap_views, v);
 	}
 	if (IG.state != IG_RUNNING)
 		IG.state = IG_IMAGE_VIEWS;
@@ -216,6 +208,7 @@ IG_vk_swapchain_cleanup(void)
 		vkDestroySemaphore, (IG.vulkan->device, *sem, NULL)
 	);
 	arr_count(IG.renderer->render_semaphores) = 0;
+	vkDestroyImageView(IG.vulkan->device, IG.buffer->depth_view, NULL);
 }
 
 void
@@ -237,5 +230,6 @@ IG_vk_swapchain_recreate(void)
 
 	IG_vk_swapchain();
 	IG_vk_swapchain_views();
+	IG_vk_depth_resources();
 	IG_vk_sync_render_semaphores();
 }

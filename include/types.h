@@ -7,6 +7,7 @@
 
 # include <stdbool.h>
 # include <stdint.h>
+# include <string.h>
 # include <stdio.h>
 
 typedef uint64_t	u64;
@@ -28,15 +29,16 @@ typedef double		f64;
 
 # define    shift_args(ac, av)  (ac--, *av++)
 # define    unused(_x)          (void)(_x)
+# define	alignas(_x)			__attribute__((aligned(_x)))
 
 # define    info(_s, ...)                                              \
-    dprintf(2, "[INFO]   | "_s"\n", ##__VA_ARGS__);
+    dprintf(2, "[INFO]   | %s:%s:%d "_s"\n", __FILE__, __func__, __LINE__, ##__VA_ARGS__);
 
 # define    error(_s, ...)                                            \
-    dprintf(2, "[ERROR]  | "_s"\n", ##__VA_ARGS__);
+    dprintf(2, "[ERROR]  | %s:%s:%d "_s"\n", __FILE__, __func__, __LINE__, ##__VA_ARGS__);
 
 # define    warning(_s, ...)                                          \
-    dprintf(2, "[WARNING]| "_s"\n", ##__VA_ARGS__);
+    dprintf(2, "[WARNING]| %s:%s:%d "_s"\n", __FILE__, __func__, __LINE__, ##__VA_ARGS__);
 
 # define    _concat(_a, _b)			_a##_b
 # define    concat(_a, _b)			_concat(_a, _b)

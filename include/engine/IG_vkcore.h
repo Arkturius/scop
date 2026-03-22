@@ -11,6 +11,7 @@
 
 typedef struct _vulkan_ctx			VulkanCtx;
 typedef VkDebugUtilsMessengerEXT	VkDebug;
+typedef bool						(*qfps_finder)(VkQueueFamilyProperties *, u32);
 
 struct _vulkan_ctx
 {
@@ -40,7 +41,6 @@ IG_vk_surface(void);
 void
 IG_vk_physical_device(void);
 
-typedef bool	(*qfps_finder)(VkQueueFamilyProperties *, u32);
 
 bool
 IG_vk_qfps_graphics(VkQueueFamilyProperties *props, u32 idx);

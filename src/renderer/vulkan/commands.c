@@ -6,6 +6,7 @@
 #include <IG_vkcore.h>
 #include <IG_renderer.h>
 #include <IG_memory.h>
+#include <vulkan/vulkan_core.h>
 
 void
 IG_vk_command_pool(void)
@@ -45,7 +46,7 @@ IG_vk_command_buffers(void)
 }
 
 static void 
-IG_vk_transition_image_layout
+IG_vk_transition_buffer_image_layout
 (
     u32						image_index,
     VkImageLayout			old_layout,
@@ -88,6 +89,47 @@ IG_vk_transition_image_layout
 	vkCmdPipelineBarrier2(IG.renderer->cmd_buffers.items[IG.current_frame], &dep_info);
 }
 
+VkCommandBuffer
+IG_vk_command_buffer_single(void)
+{
+	const VkCommandBufferAllocateInfo alloc_info = 
+	{
+		.sType				= VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool		= IG.renderer->cmd_pool,
+		.level				= VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount	= 1,
+	};
+
+	VkCommandBuffer	cmd_buf;
+
+	if (vkAllocateCommandBuffers(IG.vulkan->device, &alloc_info, &cmd_buf) != VK_SUCCESS)
+		IG_panic("failed to allocate single command buffer.");
+
+	const VkCommandBufferBeginInfo begin_info = 
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+
+	vkBeginCommandBuffer(cmd_buf, &begin_info);
+	return (cmd_buf);
+}
+
+void
+IG_vk_command_buffer_single_end(VkCommandBuffer cmd_buf)
+{
+	vkEndCommandBuffer(cmd_buf);
+
+	const VkSubmitInfo sub_info = 
+	{
+		.sType					= VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount		= 1,
+		.pCommandBuffers		= &cmd_buf,
+	};
+	vkQueueSubmit(IG.vulkan->graphics_queue, 1, &sub_info, NULL);
+	vkQueueWaitIdle(IG.vulkan->graphics_queue);
+}
+
 void
 IG_vk_record_cmd_buffer(u32 image_index)
 {
@@ -99,7 +141,7 @@ IG_vk_record_cmd_buffer(u32 image_index)
 	};
 
 	vkBeginCommandBuffer(cmd_buffer, &begin_info);
-	IG_vk_transition_image_layout
+	IG_vk_transition_buffer_image_layout
 	(
 		image_index,
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -110,7 +152,37 @@ IG_vk_record_cmd_buffer(u32 image_index)
 		VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
 	);
 
-	VkClearValue	clear_color		= (VkClearValue){(VkClearColorValue){{0, 0, 0, 1}}};
+	const VkImageMemoryBarrier2 depth_barrier = 
+	{
+		.sType					= VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+		.oldLayout				= VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout				= VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.srcStageMask			= VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+        .dstStageMask			= VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        .dstAccessMask			= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+        .srcQueueFamilyIndex	= VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex	= VK_QUEUE_FAMILY_IGNORED,
+        .image					= IG.buffer->depth,
+        .subresourceRange		= (VkImageSubresourceRange)
+		{
+            .aspectMask		= VK_IMAGE_ASPECT_DEPTH_BIT,
+            .baseMipLevel	= 0,
+            .levelCount		= 1,
+            .baseArrayLayer	= 0,
+            .layerCount		= 1
+        }
+	};
+	const VkDependencyInfo depth_barrier_info =
+	{
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.imageMemoryBarrierCount = 1,
+		.pImageMemoryBarriers = &depth_barrier,
+	};
+	vkCmdPipelineBarrier2(cmd_buffer, &depth_barrier_info);
+
+	VkClearValue	clear_color			= (VkClearValue){.color = (VkClearColorValue){{0, 0, 0, 1}}};
+	VkClearValue	clear_depth_color	= (VkClearValue){.depthStencil = (VkClearDepthStencilValue){1.0, 0}};
+
 	VkRenderingInfo	rendering_info	=
 	{
 		.sType					= VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -125,6 +197,15 @@ IG_vk_record_cmd_buffer(u32 image_index)
 			.loadOp			= VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp		= VK_ATTACHMENT_STORE_OP_STORE,
 			.clearValue		= clear_color
+		},
+		.pDepthAttachment		= &(VkRenderingAttachmentInfo)
+		{
+			.sType			= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+			.imageView		= IG.buffer->depth_view,
+			.imageLayout	= VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.loadOp			= VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp		= VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.clearValue		= clear_depth_color
 		},
 	};
 
@@ -141,7 +222,7 @@ IG_vk_record_cmd_buffer(u32 image_index)
 			.width		= IG.renderer->swap_extent.width,
 			.height		= IG.renderer->swap_extent.height,
 			.minDepth	= 0.0f,
-			.maxDepth	= 0.0f,
+			.maxDepth	= 1.0f,
 		}
 	);
 	vkCmdSetScissor
@@ -152,10 +233,17 @@ IG_vk_record_cmd_buffer(u32 image_index)
 			.extent 	= IG.renderer->swap_extent,
 		}
 	);
-	vkCmdDrawIndexed(cmd_buffer, array_len(indices), 1, 0, 0, 0);
+	vkCmdBindDescriptorSets
+	(
+		cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		IG.renderer->pp_layout,
+		0, 1, &IG.renderer->descriptor_sets.items[IG.current_frame],
+		0, NULL
+	);
+	vkCmdDrawIndexed(cmd_buffer, arr_count(IG.model_data.f) * 3, 1, 0, 0, 0);
 	vkCmdEndRendering(cmd_buffer);
 
-	IG_vk_transition_image_layout
+	IG_vk_transition_buffer_image_layout
 	(
 		image_index,
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -185,6 +273,7 @@ IG_vk_draw_frame(void)
 		IG.vulkan->device, IG.renderer->swapchain, UINT64_MAX,
 		present_semaphore, NULL, &image_index
 	);
+
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
 		vkResetFences(IG.vulkan->device, 1, &draw_fence);
@@ -193,7 +282,9 @@ IG_vk_draw_frame(void)
 	}
 	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 		IG_panic("failed to acquire next image.");
-	
+
+	IG_vk_update_uniforms();
+
 	VkSemaphore		render_semaphore	= IG.renderer->render_semaphores.items[image_index];
 
 	IG_vk_record_cmd_buffer(image_index);
